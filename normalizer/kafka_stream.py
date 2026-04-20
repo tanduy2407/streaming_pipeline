@@ -1,0 +1,50 @@
+from kafka import KafkaConsumer, KafkaProducer
+import json
+
+
+class KafkaConsumerStream:
+    def __init__(self, org_id: str):
+        """Initialize Kafka consumer for consuming raw logs."""
+        self.org_id = org_id
+        self.topic = f"logs.raw.{org_id}"
+        self.consumer = KafkaConsumer(
+            self.topic,
+            bootstrap_servers="localhost:9092",
+            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+            auto_offset_reset="earliest",
+            enable_auto_commit=True,
+            group_id="normalizer-group"
+        )
+
+    def consume_messages(self):
+        """Consume messages from Kafka topic."""
+        for message in self.consumer:
+            yield message.value
+
+    def close(self):
+        """Close the consumer connection."""
+        self.consumer.close()
+
+
+class KafkaProducerStream:
+    def __init__(self, org_id: str):
+        """Initialize Kafka producer for publishing normalized logs."""
+        self.org_id = org_id
+        self.producer = KafkaProducer(
+            bootstrap_servers="localhost:9092",
+            value_serializer=lambda m: json.dumps(m).encode("utf-8")
+        )
+
+    def publish_message(self, message: dict):
+        """Publish a message to Kafka topic."""
+        topic = f"logs.normalized.{self.org_id}"
+        future = self.producer.send(topic, message)
+        return future.get(timeout=10)
+
+    def flush(self):
+        """Flush pending messages."""
+        self.producer.flush()
+
+    def close(self):
+        """Close the producer connection."""
+        self.producer.close()

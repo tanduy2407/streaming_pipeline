@@ -1,8 +1,14 @@
 from datetime import datetime, timezone
 from abc import ABC, abstractmethod
+import logging
 from model import OcsfAuthenticationEvent, Endpoint, User, Metadata
 from registry import NormalizerRegistry
-
+from kafka_stream import KafkaConsumerStream, KafkaProducerStream
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class NormalizationError(Exception):
     pass
@@ -166,35 +172,50 @@ def normalize_event(raw_json: str):
     return normalizer.normalize(raw_json)
 
 
-raw_event = {
-    "timestamp": "2026-04-10T14:32:01.000Z",
-    "agent": { "id": "001", "name": "web-srv-01" },
-    "rule": { "id": "5715", "level": 5, "description": "sshd: authentication success" },
-    "data": {
-        "srcip": "10.0.1.42",
-        "srcuser": "jdoe",
-        "dstuser": "root",
-        "result": "success"
-    },
-    "location": "/var/log/auth.log",
-    "decoder": { "name": "sshd" }
-}
+def stream_pipeline(org_id: str):
+    """Consume raw data from logs.raw.{org_id} topic, normalize, and publish to logs.normalized.{org_id}."""
+    consumer = None
+    producer = None
+    try:
+        consumer = KafkaConsumerStream(org_id)
+        producer = KafkaProducerStream(org_id)
+        logger.info(f"Connected to topic: logs.raw.{org_id}")
+        logger.info(f"Publishing to topic: logs.normalized.{org_id}")
+        logger.info("Waiting for messages...")
+        
+        message_count = 0
+        for message in consumer.consume_messages():
+            try:
+                message_count += 1
+                logger.info(f"Received message #{message_count}")
+                
+                # Normalize the event
+                normalized_event = normalize_event(message)
+                logger.info(f"Normalized event: {normalized_event.metadata.product}")
+                
+                # Publish to normalized topic
+                producer.publish_message(normalized_event.to_dict())
+                logger.info(f"Published normalized event #{message_count}")
+                
+            except NormalizationError as e:
+                logger.error(f"Normalization error: {e}")
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+            
+    except KeyboardInterrupt:
+        logger.info("Consumer interrupted by user")
+    except Exception as e:
+        logger.error(f"Error consuming messages: {e}")
+    finally:
+        if producer:
+            producer.flush()
+            producer.close()
+            logger.info("Producer closed")
+        if consumer:
+            consumer.close()
+            logger.info("Consumer closed")
 
-# raw_event = {
-#     "eventVersion": "1.09",
-#     "eventTime": "2026-04-10T14:35:22Z",
-#     "eventSource": "signin.amazonaws.com",
-#     "eventName": "ConsoleLogin",
-#     "awsRegion": "us-east-1",
-#     "sourceIPAddress": "203.0.113.55",
-#     "userIdentity": {
-#         "type": "IAMUser",
-#         "arn": "arn:aws:iam::123456789012:user/alice",
-#         "userName": "alice"
-#     },
-#     "responseElements": { "ConsoleLogin": "Success" }
-# }
+if __name__ == "__main__":
+    org_id = "example_org"
+    stream_pipeline(org_id)
 
-event = normalize_event(raw_event)
-
-print(event)

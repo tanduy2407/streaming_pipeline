@@ -40,3 +40,32 @@ class OcsfAuthenticationEvent:
     metadata: Optional[Metadata] = None
 
     unmapped: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "class_uid": self.class_uid,
+            "category_uid": self.category_uid,
+            "activity_id": self.activity_id,
+            "time": self.time,
+            "status_id": self.status_id,
+            "severity_id": self.severity_id,
+            "src_endpoint": {
+                "ip": self.src_endpoint.ip,
+                "hostname": self.src_endpoint.hostname
+            } if self.src_endpoint else None,
+            "dst_endpoint": {
+                "ip": self.dst_endpoint.ip,
+                "hostname": self.dst_endpoint.hostname
+            } if self.dst_endpoint else None,
+            "user": {
+                "name": self.user.name,
+                "uid": self.user.uid
+            } if self.user else None,
+            "metadata": {
+                "product": self.metadata.product,
+                "version": self.metadata.version,
+                "org_id": self.metadata.org_id
+            } if self.metadata else None,
+            "unmapped": self.unmapped
+        }
