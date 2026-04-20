@@ -1,8 +1,21 @@
 from datetime import datetime, timezone
-import json
 from abc import ABC, abstractmethod
-from model import OcsfAuthenticationEvent, Endpoint, User, Metadata
+import logging
+import sys
+from pathlib import Path
 
+# Add parent directories to path
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "model"))
+
+from model import OcsfAuthenticationEvent, Endpoint, User, Metadata
+from registry import NormalizerRegistry
+from kafka_stream import KafkaConsumerStream, KafkaProducerStream
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class NormalizationError(Exception):
     pass
@@ -11,14 +24,15 @@ class NormalizationError(Exception):
 class Normalizer(ABC):
 
     @abstractmethod
-    def normalize(self, raw_json: str) -> OcsfAuthenticationEvent:
+    def normalize(self, raw_json: str, org_id: str) -> OcsfAuthenticationEvent:
         pass
 
-class WazuhNormalizer(Normalizer):
 
-    def normalize(self, raw_json: str) -> OcsfAuthenticationEvent:
+@NormalizerRegistry.register("wazuh")
+class WazuhNormalizer(Normalizer):
+    def normalize(self, raw_json: dict, org_id: str) -> OcsfAuthenticationEvent:
         try:
-            data = json.loads(raw_json)
+            data = raw_json
         except Exception as e:
             raise NormalizationError("Invalid JSON") from e
 
@@ -28,7 +42,8 @@ class WazuhNormalizer(Normalizer):
             # --- TIME ---
             # Wazuh: "timestamp": ISO8601 → convert to epoch millis
             time = int(
-                datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
+                datetime.fromisoformat(
+                    data["timestamp"].replace("Z", "+00:00"))
                 .timestamp() * 1000
             )
 
@@ -43,8 +58,6 @@ class WazuhNormalizer(Normalizer):
                 status_id = 1
             elif result == "failure":
                 status_id = 2
-            else:
-                status_id = 3
 
             # --- USER ---
             # OCSF decision:
@@ -76,29 +89,29 @@ class WazuhNormalizer(Normalizer):
                 metadata=Metadata(
                     product="wazuh",
                     version=None,
-                    org_id=None
+                    org_id=org_id
                 ),
                 unmapped=unmapped
             )
-
         except Exception as e:
             raise NormalizationError("Failed to normalize Wazuh event") from e
-        
-class CloudTrailNormalizer(Normalizer):
 
-    def normalize(self, raw_json: str) -> OcsfAuthenticationEvent:
+
+@NormalizerRegistry.register("cloudtrail")
+class CloudTrailNormalizer(Normalizer):
+    def normalize(self, raw_json: dict, org_id: str) -> OcsfAuthenticationEvent:
         try:
-            data = json.loads(raw_json)
+            data = raw_json
         except Exception as e:
             raise NormalizationError("Invalid JSON") from e
-
         try:
             unmapped = {}
 
             # --- TIME ---
             # CloudTrail: eventTime
             time = int(
-                datetime.fromisoformat(data["eventTime"].replace("Z", "+00:00"))
+                datetime.fromisoformat(
+                    data["eventTime"].replace("Z", "+00:00"))
                 .timestamp() * 1000
             )
 
@@ -115,8 +128,6 @@ class CloudTrailNormalizer(Normalizer):
                 status_id = 1
             elif login_status == "failure":
                 status_id = 2
-            else:
-                status_id = 3
 
             # --- USER ---
             user_name = data.get("userIdentity", {}).get("userName")
@@ -142,10 +153,73 @@ class CloudTrailNormalizer(Normalizer):
                 metadata=Metadata(
                     product="cloudtrail",
                     version=None,
-                    org_id=None
+                    org_id=org_id
                 ),
                 unmapped=unmapped
             )
-
         except Exception as e:
-            raise NormalizationError("Failed to normalize CloudTrail event") from e
+            raise NormalizationError(
+                "Failed to normalize CloudTrail event") from e
+
+def detect_source_type(raw_json: dict):
+    if all(k in raw_json for k in ["agent", "rule"]):
+        return "wazuh"
+    if all(k in raw_json for k in ["awsRegion", "userIdentity"]):
+        return "cloudtrail"
+    raise ValueError("Unknown source type")
+
+def normalize_event(raw_json: str, org_id: str):
+    source_type = detect_source_type(raw_json)
+    print(f"Detected source type: {source_type}")
+    normalizer = NormalizerRegistry.get(source_type)
+    return normalizer.normalize(raw_json, org_id)
+
+
+def stream_pipeline(org_id: str):
+    """Consume raw data from logs.raw.{org_id} topic, normalize, and publish to logs.normalized.{org_id}."""
+    consumer = None
+    producer = None
+    try:
+        consumer = KafkaConsumerStream(org_id)
+        producer = KafkaProducerStream(org_id)
+        logger.info(f"Connected to topic: logs.raw.{org_id}")
+        logger.info(f"Publishing to topic: logs.normalized.{org_id}")
+        logger.info("Waiting for messages...")
+        
+        message_count = 0
+        for message in consumer.consume_messages():
+            try:
+                message_count += 1
+                logger.info(f"Received message #{message_count}")
+                
+                # Normalize the event
+                normalized_event = normalize_event(message)
+                print(normalized_event)
+                logger.info(f"Normalized event: {normalized_event.metadata.product}")
+                
+                # Publish to normalized topic
+                producer.publish_message(normalized_event.to_dict())
+                logger.info(f"Published normalized event #{message_count}")
+                
+            except NormalizationError as e:
+                logger.error(f"Normalization error: {e}")
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+            
+    except KeyboardInterrupt:
+        logger.info("Consumer interrupted by user")
+    except Exception as e:
+        logger.error(f"Error consuming messages: {e}")
+    finally:
+        if producer:
+            producer.flush()
+            producer.close()
+            logger.info("Producer closed")
+        if consumer:
+            consumer.close()
+            logger.info("Consumer closed")
+
+if __name__ == "__main__":
+    org_id = "123"
+    stream_pipeline(org_id)
+

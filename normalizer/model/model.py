@@ -29,7 +29,7 @@ class OcsfAuthenticationEvent:
 
     time: int = 0  # epoch millis
 
-    status_id: int = 3  # 1=Success, 2=Failure, 3=Unknown
+    status_id: int  # 1=Success, 2=Failure (required)
     severity_id: Optional[int] = None
 
     src_endpoint: Optional[Endpoint] = None
