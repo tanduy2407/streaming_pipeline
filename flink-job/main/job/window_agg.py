@@ -96,7 +96,7 @@ def build_windowagg_pipeline(kafka_stream):
         .key_by(lambda e: e["metadata"]["org_id"])
 
         # Tumbling window based on processing time
-        .window(TumblingProcessingTimeWindow.of(Time.seconds(10)))
+        .window(TumblingProcessingTimeWindow.of(Time.minutes(2)))
 
         # NOTE: allowed_lateness + late data handling has no effect in processing-time windows
         .allowed_lateness(late_duration)

@@ -93,7 +93,8 @@ def build_bruteforce_pipeline(kafka_stream):
         ))
         # Use session window: dynamically groups bursts of activity
         .window(EventTimeSessionWindows.with_gap(Time.minutes(2)))
-        # Allow small delay for late-arriving events
+        # Allow late events to still modify existing sessions
+        # Important: late events may extend or merge sessions, will be handled by Flink
         .allowed_lateness(late_duration)
         # Redirect very late events to side output (DLQ)
         .side_output_late_data(late_tag)
