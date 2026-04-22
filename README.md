@@ -1,5 +1,5 @@
 # Streaming Security Pipeline
-## 1.Architecture Overview
+## 1. Architecture Overview
 The pipeline ingests, processes, and serves authentication events in a multi-tenant environment:
 
 ### Ingestion Layer
@@ -26,35 +26,35 @@ Aggregated results are written to OpenSearch
 
 Data is tiered into hot/warm storage for cost-performance balance
 
-## 2.Build Instructions
-### 1. Prerequisites
+## 2. Build Instructions
+### Prerequisites
 - Python 3.9+
 - Java 8 or 11
 - Apache Flink (1.17+)
 - Kafka cluster
 - (Optional) Docker for local setup
-### 2.Install Dependencies
+### Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
-### 3. Run the Kafka job
+### Run the Kafka job
 ```bash
 python normalized.py
 ```
 
-### 4. Run the Flink job
+### Run the Flink job
 ```bash
 python window_agg.py
 python brute_force_detection.py
 ```
 
-### 5. Run the the unit test
+### Run the the unit test
 ```bash
 pytest normalizer\test\unit_test.py
 pytest flink-job\test\test_job.py
 ```
 ## 3. Assumptions
-### 1. Kafka Infrastructure is Pre-Provisioned
+### Kafka Infrastructure is Pre-Provisioned
 A Kafka cluster is already available and fully operational
 
 All required topics are pre-created for all tenants:
@@ -70,7 +70,7 @@ It focuses on:
 - pulling data from Kafka, normalize and produce to Kafka topic
 - processing data from Kafka and aggregating data with Flink jobs
 
-### 2.Data Pipeline Scope
+### Data Pipeline Scope
 The implementation starts from: `logs.raw.{org_id}`
 
 The following components are out of scope:
@@ -86,7 +86,7 @@ The following components are out of scope:
 - Handle failures (DLQ)
 - Write results to OpenSearch
 
-### 3. Multi-Tenant Topic Availability
+### Multi-Tenant Topic Availability
 The system assumes:
 
 Topics for all org_id already exist
@@ -110,8 +110,8 @@ Flink Job
   ↓  
 OpenSearch + `dlq.normalized.{org_id}`
 
-### Design Decisions & Trade-offs
-#### 1. Per-Tenant Topics
+## 5. Design Decisions & Trade-offs
+### Per-Tenant Topics
 ✅ Strong isolation (no cross-tenant mixing)
 
 ✅ Easier debugging and replay per tenant
@@ -120,7 +120,7 @@ OpenSearch + `dlq.normalized.{org_id}`
 
 👉 Trade-off: Chosen for isolation and scalability, at the cost of higher Kafka metadata overhead.
 
-#### 2. Pattern-Based Consumption
+### Based Consumption
 
 Consumers subscribe to:
 
@@ -130,7 +130,7 @@ logs.normalized.{org_id}
 
 ❌ Less control compared to explicit topic subscription
 
-#### 3. At-Least-Once Delivery
+### At-Least-Once Delivery
 Kafka guarantees at-least-once delivery
 
 Combined with Flink checkpointing for correctness
@@ -139,14 +139,14 @@ Combined with Flink checkpointing for correctness
 
 👉 Trade-off: Duplicates are tolerated and handled downstream rather than enforcing stricter guarantees at Kafka level.
 
-#### 4. Dead Letter Queue (DLQ)
+### Dead Letter Queue (DLQ)
 ✅ Prevents pipeline crashes due to bad data
 
 ✅ Enables debugging and reprocessing
 
 ❌ Requires monitoring and storage
 
-## 5. Kafka Layer
+## 6. Kafka Layer
 ### Overview
 
 Apache Kafka acts as the central event streaming backbone in this architecture. It decouples ingestion, processing, and storage layers while enabling scalable, real-time, multi-tenant data processing.
@@ -183,7 +183,7 @@ Stores:
 - Unprocessable events
 - Enables debugging and replay
 
-## 6. Flink Layer
+## 7. Flink Layer
 ### 1. Source (Kafka Consumer)
 The job consumes from:
 
@@ -197,13 +197,13 @@ Deserialization
 - JSON → structured object (Python dict)
 - Invalid messages are immediately routed to the DLQ
 
-### 3. Keying Strategy (Multi-Tenant Isolation)
+### 2. Keying Strategy (Multi-Tenant Isolation)
 Stream will be key by org_id and src_ip
 - All downstream operations are scoped per tenant
 - Prevents cross-tenant data mixing
 - Enables parallel and scalable processing
 
-### 5. Windowing Strategy
+### 3. Windowing Strategy
 
 Depending on implementation:
 
@@ -237,7 +237,7 @@ Late events may:
 
 Late events after allow-lateness will be publish to DLQ topic:` dlq.normalized.{org_id}`
 
-### 6. Aggregation Logic
+### 4. Aggregation Logic
 
 Within each window:
 
