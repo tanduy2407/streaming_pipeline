@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "model"))
 
 from model import OcsfAuthenticationEvent, Endpoint, User, Metadata
 from registry import NormalizerRegistry
-from kafka_stream import KafkaConsumerStream, KafkaProducerStream
+from kafka_stream import KafkaConsumerStream, KafkaProducerStream, KafkaDLQProducer, build_dlq_event
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -25,6 +25,10 @@ class Normalizer(ABC):
 
     @abstractmethod
     def normalize(self, raw_json: str, org_id: str) -> OcsfAuthenticationEvent:
+        """
+        Convert raw source-specific event into standardized OCSF event.
+        Must be implemented by each source-specific normalizer.
+        """
         pass
 
 
@@ -162,6 +166,10 @@ class CloudTrailNormalizer(Normalizer):
                 "Failed to normalize CloudTrail event") from e
 
 def detect_source_type(raw_json: dict):
+    """
+    Detect source system based on presence of key fields.
+    This is a simple heuristic (can be replaced with schema registry in production).
+    """
     if all(k in raw_json for k in ["agent", "rule"]):
         return "wazuh"
     if all(k in raw_json for k in ["awsRegion", "userIdentity"]):
@@ -169,19 +177,31 @@ def detect_source_type(raw_json: dict):
     raise ValueError("Unknown source type")
 
 def normalize_event(raw_json: str, org_id: str):
+    """
+    Detect source type and apply corresponding normalizer.
+    """
     source_type = detect_source_type(raw_json)
     print(f"Detected source type: {source_type}")
+
+    # Retrieve correct normalizer from registry
     normalizer = NormalizerRegistry.get(source_type)
     return normalizer.normalize(raw_json, org_id)
 
 
 def stream_pipeline(org_id: str):
-    """Consume raw data from logs.raw.{org_id} topic, normalize, and publish to logs.normalized.{org_id}."""
+    """
+    End-to-end streaming pipeline:
+    - Consume raw events from Kafka topic logs.raw.{org_id}
+    - Normalize to OCSF format
+    - Publish to logs.normalized.{org_id}
+    """
     consumer = None
     producer = None
+    dlq_producer = None
     try:
         consumer = KafkaConsumerStream(org_id)
         producer = KafkaProducerStream(org_id)
+        dlq_producer = KafkaDLQProducer(org_id)
         logger.info(f"Connected to topic: logs.raw.{org_id}")
         logger.info(f"Publishing to topic: logs.normalized.{org_id}")
         logger.info("Waiting for messages...")
@@ -202,7 +222,11 @@ def stream_pipeline(org_id: str):
                 logger.info(f"Published normalized event #{message_count}")
                 
             except NormalizationError as e:
+                # Handle known normalization issues (bad schema, missing fields, etc.)
                 logger.error(f"Normalization error: {e}")
+                # Send to DLQ
+                dlq_event = build_dlq_event(message, e, org_id)
+                dlq_producer.publish_message(dlq_event)
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
             

@@ -5,6 +5,7 @@ Flink job for detecting brute force attacks based on failed authentication attem
 from pyflink.datastream.functions import AggregateFunction, ProcessWindowFunction
 from pyflink.datastream.window import EventTimeSessionWindows
 from pyflink.common.time import Time
+from pyflink.common import WatermarkStrategy, Duration
 from datetime import datetime
 from flink_kafka_utils import create_env, create_kafka_source, create_kafka_sink, create_late_tag
 
@@ -75,6 +76,19 @@ class BruteForceWindowFunction(ProcessWindowFunction):
         out.collect(alert)
 
 
+def assign_event_time(stream):
+    return (
+        stream.assign_timestamps_and_watermarks(
+            WatermarkStrategy
+            # Allow events to arrive up to 30 seconds late
+            .for_bounded_out_of_orderness(Duration.of_seconds(30))
+            # Extract event time from your normalized event
+            .with_timestamp_assigner(
+                lambda event, timestamp: event["time"]  # epoch millis
+            )
+        )
+    )
+
 # Side output tag for late events (arriving after allowed lateness)
 late_tag = create_late_tag()
 
@@ -91,7 +105,8 @@ def build_bruteforce_pipeline(kafka_stream):
             e["metadata"]["org_id"],
             e["src_endpoint"]["ip"]
         ))
-        # Use session window: dynamically groups bursts of activity
+        # Session window groups events based on inactivity gap
+        # If no event arrives within 2 minutes, session is closed
         .window(EventTimeSessionWindows.with_gap(Time.minutes(2)))
         # Allow late events to still modify existing sessions
         # Important: late events may extend or merge sessions, will be handled by Flink
@@ -124,6 +139,9 @@ def create_flink_job(org_id: str):
     )
 
     kafka_stream = env.add_source(kafka_source)
+
+    # Assign event time and watermarks for proper windowing and late event handling
+    kafka_stream = assign_event_time(kafka_stream)
 
     # Build detection pipeline
     bruteforce_stream = build_bruteforce_pipeline(kafka_stream)

@@ -1,3 +1,5 @@
+import datetime
+
 from kafka import KafkaConsumer, KafkaProducer
 import json
 
@@ -48,3 +50,17 @@ class KafkaProducerStream:
     def close(self):
         """Close the producer connection."""
         self.producer.close()
+
+class KafkaDLQProducer(KafkaProducerStream):
+    def __init__(self, org_id: str):
+        super().__init__(org_id)
+        self.topic = f"logs.dlq.{org_id}"
+
+def build_dlq_event(raw_message: dict, error: Exception, org_id: str):
+    return {
+        "org_id": org_id,
+        "error": str(error),
+        "error_type": type(error).__name__,
+        "raw_event": raw_message,
+        "failed_at": datetime.utcnow().isoformat() + "Z"
+    }
