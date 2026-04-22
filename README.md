@@ -111,7 +111,7 @@ Flink Job
 OpenSearch + `dlq.normalized.{org_id}`
 
 ### Design Decisions & Trade-offs
-#### 1.Per-Tenant Topics
+#### 1. Per-Tenant Topics
 ✅ Strong isolation (no cross-tenant mixing)
 
 ✅ Easier debugging and replay per tenant
@@ -120,7 +120,7 @@ OpenSearch + `dlq.normalized.{org_id}`
 
 👉 Trade-off: Chosen for isolation and scalability, at the cost of higher Kafka metadata overhead.
 
-#### 2.Pattern-Based Consumption
+#### 2. Pattern-Based Consumption
 
 Consumers subscribe to:
 
@@ -130,7 +130,7 @@ logs.normalized.{org_id}
 
 ❌ Less control compared to explicit topic subscription
 
-#### 3.At-Least-Once Delivery
+#### 3. At-Least-Once Delivery
 Kafka guarantees at-least-once delivery
 
 Combined with Flink checkpointing for correctness
@@ -139,7 +139,7 @@ Combined with Flink checkpointing for correctness
 
 👉 Trade-off: Duplicates are tolerated and handled downstream rather than enforcing stricter guarantees at Kafka level.
 
-#### 4.Dead Letter Queue (DLQ)
+#### 4. Dead Letter Queue (DLQ)
 ✅ Prevents pipeline crashes due to bad data
 
 ✅ Enables debugging and reprocessing
