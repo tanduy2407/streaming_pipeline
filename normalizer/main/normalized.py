@@ -213,7 +213,7 @@ def stream_pipeline(org_id: str):
                 logger.info(f"Received message #{message_count}")
                 
                 # Normalize the event
-                normalized_event = normalize_event(message)
+                normalized_event = normalize_event(message, org_id)
                 print(normalized_event)
                 logger.info(f"Normalized event: {normalized_event.metadata.product}")
                 
@@ -244,6 +244,6 @@ def stream_pipeline(org_id: str):
             logger.info("Consumer closed")
 
 if __name__ == "__main__":
-    org_id = "123"
+    org_id = "test_org"
     stream_pipeline(org_id)
 

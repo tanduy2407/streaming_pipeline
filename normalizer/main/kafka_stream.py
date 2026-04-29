@@ -11,7 +11,7 @@ class KafkaConsumerStream:
         self.topic = f"logs.raw.{org_id}"
         self.consumer = KafkaConsumer(
             self.topic,
-            bootstrap_servers="localhost:9092",
+            bootstrap_servers="kafka:29092",
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
             auto_offset_reset="earliest",
             enable_auto_commit=True,
@@ -33,7 +33,7 @@ class KafkaProducerStream:
         """Initialize Kafka producer for publishing normalized logs."""
         self.org_id = org_id
         self.producer = KafkaProducer(
-            bootstrap_servers="localhost:9092",
+            bootstrap_servers="kafka:29092",
             value_serializer=lambda m: json.dumps(m).encode("utf-8")
         )
 
