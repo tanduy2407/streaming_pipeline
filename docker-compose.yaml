@@ -39,6 +39,14 @@ services:
     - ./event_producer:/app
     depends_on:
       - kafka
+  
+  normalizer:
+    build: ./normalizer
+    container_name: normalizer
+    volumes:
+      - ./normalizer:/app
+    depends_on:
+      - kafka
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest

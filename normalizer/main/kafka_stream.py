@@ -1,5 +1,4 @@
-import datetime
-
+import time
 from kafka import KafkaConsumer, KafkaProducer
 import json
 
@@ -9,14 +8,21 @@ class KafkaConsumerStream:
         """Initialize Kafka consumer for consuming raw logs."""
         self.org_id = org_id
         self.topic = f"logs.raw.{org_id}"
-        self.consumer = KafkaConsumer(
-            self.topic,
-            bootstrap_servers="kafka:29092",
-            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-            auto_offset_reset="earliest",
-            enable_auto_commit=True,
-            group_id="normalizer-group"
-        )
+        while True:
+            try:
+                self.consumer = KafkaConsumer(
+                    self.topic,
+                    bootstrap_servers="kafka:29092",
+                    value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+                    auto_offset_reset="earliest",
+                    enable_auto_commit=True,
+                    group_id="normalizer-group"
+                )
+                print(f"✅ Connected to Kafka topic: {self.topic}")
+                break
+            except Exception as e:
+                print(f"Error connecting to Kafka: {e}")
+                time.sleep(5)  # Retry after delay
 
     def consume_messages(self):
         """Consume messages from Kafka topic."""
@@ -32,14 +38,24 @@ class KafkaProducerStream:
     def __init__(self, org_id: str):
         """Initialize Kafka producer for publishing normalized logs."""
         self.org_id = org_id
-        self.producer = KafkaProducer(
-            bootstrap_servers="kafka:29092",
-            value_serializer=lambda m: json.dumps(m).encode("utf-8")
-        )
+        while True:
+            try:
+                self.producer = KafkaProducer(
+                    bootstrap_servers="kafka:29092",
+                    value_serializer=lambda m: json.dumps(m).encode("utf-8")
+                )
+                print(f"✅ Connected to Kafka for producing to topic: logs.normalized.{self.org_id}")
+                break
+            except Exception as e:
+                print(f"Error connecting to Kafka: {e}")
+                time.sleep(5)  # Retry after delay
 
+    def get_topic(self):
+        return f"logs.normalized.{self.org_id}"
+    
     def publish_message(self, message: dict):
         """Publish a message to Kafka topic."""
-        topic = f"logs.normalized.{self.org_id}"
+        topic = self.get_topic()
         future = self.producer.send(topic, message)
         return future.get(timeout=10)
 
@@ -51,16 +67,11 @@ class KafkaProducerStream:
         """Close the producer connection."""
         self.producer.close()
 
+
 class KafkaDLQProducer(KafkaProducerStream):
     def __init__(self, org_id: str):
         super().__init__(org_id)
-        self.topic = f"logs.dlq.{org_id}"
 
-def build_dlq_event(raw_message: dict, error: Exception, org_id: str):
-    return {
-        "org_id": org_id,
-        "error": str(error),
-        "error_type": type(error).__name__,
-        "raw_event": raw_message,
-        "failed_at": datetime.utcnow().isoformat() + "Z"
-    }
+    def get_topic(self):
+        return f"logs.dlq.{self.org_id}"
+    

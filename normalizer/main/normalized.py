@@ -1,21 +1,16 @@
-from datetime import datetime, timezone
+from kafka_stream import KafkaConsumerStream, KafkaProducerStream, KafkaDLQProducer
+from registry import NormalizerRegistry
+from model.ocsf_authentication_event import OcsfAuthenticationEvent, Endpoint, User, Metadata
+from datetime import datetime
 from abc import ABC, abstractmethod
 import logging
-import sys
-from pathlib import Path
 
-# Add parent directories to path
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "model"))
-
-from model import OcsfAuthenticationEvent, Endpoint, User, Metadata
-from registry import NormalizerRegistry
-from kafka_stream import KafkaConsumerStream, KafkaProducerStream, KafkaDLQProducer, build_dlq_event
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
 
 class NormalizationError(Exception):
     pass
@@ -165,6 +160,7 @@ class CloudTrailNormalizer(Normalizer):
             raise NormalizationError(
                 "Failed to normalize CloudTrail event") from e
 
+
 def detect_source_type(raw_json: dict):
     """
     Detect source system based on presence of key fields.
@@ -176,6 +172,7 @@ def detect_source_type(raw_json: dict):
         return "cloudtrail"
     raise ValueError("Unknown source type")
 
+
 def normalize_event(raw_json: str, org_id: str):
     """
     Detect source type and apply corresponding normalizer.
@@ -186,6 +183,16 @@ def normalize_event(raw_json: str, org_id: str):
     # Retrieve correct normalizer from registry
     normalizer = NormalizerRegistry.get(source_type)
     return normalizer.normalize(raw_json, org_id)
+
+
+def build_dlq_event(raw_message: dict, error: Exception, org_id: str):
+    return {
+        "org_id": org_id,
+        "error": str(error),
+        "error_type": type(error).__name__,
+        "raw_event": raw_message,
+        "failed_at": datetime.utcnow().isoformat() + "Z"
+    }
 
 
 def stream_pipeline(org_id: str):
@@ -205,31 +212,32 @@ def stream_pipeline(org_id: str):
         logger.info(f"Connected to topic: logs.raw.{org_id}")
         logger.info(f"Publishing to topic: logs.normalized.{org_id}")
         logger.info("Waiting for messages...")
-        
+
         message_count = 0
         for message in consumer.consume_messages():
             try:
                 message_count += 1
                 logger.info(f"Received message #{message_count}")
-                
+
                 # Normalize the event
                 normalized_event = normalize_event(message, org_id)
                 print(normalized_event)
-                logger.info(f"Normalized event: {normalized_event.metadata.product}")
-                
+                logger.info(
+                    f"Normalized event: {normalized_event.metadata.product}")
+
                 # Publish to normalized topic
                 producer.publish_message(normalized_event.to_dict())
                 logger.info(f"Published normalized event #{message_count}")
-                
+
             except NormalizationError as e:
                 # Handle known normalization issues (bad schema, missing fields, etc.)
-                logger.error(f"Normalization error: {e}")
+                logger.exception("Normalization error")
                 # Send to DLQ
                 dlq_event = build_dlq_event(message, e, org_id)
                 dlq_producer.publish_message(dlq_event)
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
-            
+
     except KeyboardInterrupt:
         logger.info("Consumer interrupted by user")
     except Exception as e:
@@ -243,7 +251,7 @@ def stream_pipeline(org_id: str):
             consumer.close()
             logger.info("Consumer closed")
 
+
 if __name__ == "__main__":
     org_id = "test_org"
     stream_pipeline(org_id)
-

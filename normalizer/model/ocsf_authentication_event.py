@@ -23,13 +23,14 @@ class Metadata:
 
 @dataclass
 class OcsfAuthenticationEvent:
+    status_id: int  # 1=Success, 2=Failure (required)
+    
     class_uid: int = 3002
     category_uid: int = 3
     activity_id: int = 1  # Logon
 
     time: int = 0  # epoch millis
 
-    status_id: int  # 1=Success, 2=Failure (required)
     severity_id: Optional[int] = None
 
     src_endpoint: Optional[Endpoint] = None
