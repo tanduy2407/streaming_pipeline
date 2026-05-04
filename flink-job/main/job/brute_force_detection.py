@@ -2,10 +2,13 @@
 Flink job for detecting brute force attacks based on failed authentication attempts.
 """
 
+import json
+
 from pyflink.datastream.functions import AggregateFunction, ProcessWindowFunction
 from pyflink.datastream.window import EventTimeSessionWindows
 from pyflink.common.time import Time
 from pyflink.common import WatermarkStrategy, Duration
+from pyflink.common.watermark_strategy import TimestampAssigner
 from datetime import datetime
 from flink_kafka_utils import create_env, create_kafka_source, create_kafka_sink, create_late_tag
 
@@ -76,18 +79,19 @@ class BruteForceWindowFunction(ProcessWindowFunction):
         out.collect(alert)
 
 
+class EventTimeAssigner(TimestampAssigner):
+    def extract_timestamp(self, event, record_timestamp):
+        data = json.loads(event)
+        return int(data["time"])
+
+
 def assign_event_time(stream):
-    return (
-        stream.assign_timestamps_and_watermarks(
-            WatermarkStrategy
-            # Allow events to arrive up to 30 seconds late
-            .for_bounded_out_of_orderness(Duration.of_seconds(30))
-            # Extract event time from your normalized event
-            .with_timestamp_assigner(
-                lambda event, timestamp: event["time"]  # epoch millis
-            )
-        )
+    return stream.assign_timestamps_and_watermarks(
+        WatermarkStrategy
+        .for_bounded_out_of_orderness(Duration.of_seconds(30))
+        .with_timestamp_assigner(EventTimeAssigner())  # ✅ correct
     )
+
 
 # Side output tag for late events (arriving after allowed lateness)
 late_tag = create_late_tag()
@@ -160,15 +164,16 @@ def create_flink_job(org_id: str):
 
 
 def main():
+    org_id = "test_org"  # In production, this could be passed as an argument or env variable
     """Main entry point for the Flink job."""
     print("Starting OCSF Event Aggregation Flink Job...")
-    print("- Input Topic: logs.normalized.{org_id}")
-    print("- Output Topic: alerts.{org_id}")
-    print("- Session Window: 2-minute gap")
-    print("- Brute Force Threshold: 10 failed attempts")
+    print(f"- Input Topic: logs.normalized.{org_id}")
+    print(f"- Output Topic: alerts.{org_id}")
+    print(f"- Session Window: 2-minute gap")
+    print(f"- Brute Force Threshold: 10 failed attempts")
 
     # Build and execute Flink job
-    env = create_flink_job("123")
+    env = create_flink_job(org_id)
     env.execute("OCSF-Brute-Force-Detection")
 
 

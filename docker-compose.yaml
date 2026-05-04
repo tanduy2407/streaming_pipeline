@@ -61,7 +61,6 @@ services:
 
   jobmanager:
     build: ./flink-job
-    command: jobmanager
     ports:
       - "8081:8081"
     environment:

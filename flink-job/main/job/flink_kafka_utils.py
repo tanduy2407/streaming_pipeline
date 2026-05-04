@@ -1,12 +1,11 @@
-from pyflink.common.serialization import SimpleStringSchema, SerializationSchema
+from pyflink.common.serialization import SimpleStringSchema, DeserializationSchema, SerializationSchema
 import json
 from typing import Dict, Any
-from pyflink.datastream.connectors.kafka import FlinkKafkaConsumer, FlinkKafkaProducer
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.datastream import OutputTag
+from pyflink.datastream.connectors.kafka import KafkaSink, KafkaRecordSerializationSchema, KafkaSource
+from pyflink.datastream import StreamExecutionEnvironment, OutputTag
 
 
-class OCSFEventDeserializer(SimpleStringSchema):
+class OCSFEventDeserializer(DeserializationSchema):
     """Deserializer for OCSF events coming from Kafka (JSON -> Python dict)."""
 
     def deserialize(self, message: bytes) -> Dict[str, Any]:
@@ -30,50 +29,31 @@ class AuthEventSerializer(SerializationSchema):
 def create_env(parallelism: int = 1) -> StreamExecutionEnvironment:
     # Initialize Flink streaming execution environment
     env = StreamExecutionEnvironment.get_execution_environment()
-    
+
     # Set parallelism (number of parallel operator instances)
     env.set_parallelism(parallelism)
-    
     return env
 
 
 def create_kafka_source(topic: str, group_id: str):
-    # Kafka broker configuration
-    kafka_brokers = "localhost:9092"
-
-    # Consumer configuration
-    consumer_properties = {
-        "bootstrap.servers": kafka_brokers,
-        "group.id": group_id,
-        "auto.offset.reset": "earliest",  # Start from earliest if no offset
-        "enable.auto.commit": "true"      # Kafka manages offset commits
-    }
-
-    # Create Kafka consumer source
-    return FlinkKafkaConsumer(
-        topics=topic,
-        deserialization_schema=OCSFEventDeserializer(),  # Custom JSON deserializer
-        properties=consumer_properties
-    )
+    return KafkaSource.builder() \
+        .set_bootstrap_servers("kafka:29092") \
+        .set_topics(topic) \
+        .set_group_id(group_id) \
+        .set_value_only_deserializer(OCSFEventDeserializer()) \
+        .build()
 
 
 def create_kafka_sink(topic: str):
-    # Kafka broker configuration
-    kafka_brokers = "localhost:9092"
-
-    # Producer configuration
-    producer_properties = {
-        "bootstrap.servers": kafka_brokers,
-        "acks": "all",                 # Strong durability guarantee
-        "compression.type": "snappy"   # Improve throughput and reduce size
-    }
-
-    # Create Kafka producer sink
-    return FlinkKafkaProducer(
-        topic=topic,
-        serialization_schema=AuthEventSerializer(),  # Custom JSON serializer
-        producer_config=producer_properties
-    )
+    return KafkaSink.builder() \
+        .set_bootstrap_servers("kafka:29092") \
+        .set_record_serializer(
+            KafkaRecordSerializationSchema.builder()
+            .set_topic(topic)
+            .set_value_serialization_schema(SimpleStringSchema())
+            .build()
+    ) \
+        .build()
 
 
 def create_late_tag():

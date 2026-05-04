@@ -140,7 +140,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.1",
     "userIdentity": { "type": "IAMUser", "userName": "bob" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -150,7 +150,7 @@
     "awsRegion": "us-west-2",
     "sourceIPAddress": "198.51.100.2",
     "userIdentity": { "type": "IAMUser", "userName": "carol" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -160,7 +160,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.3",
     "userIdentity": { "type": "Root" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -170,7 +170,7 @@
     "awsRegion": "us-east-2",
     "sourceIPAddress": "198.51.100.4",
     "userIdentity": { "type": "IAMUser", "userName": "dave" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -190,7 +190,7 @@
     "awsRegion": "us-west-1",
     "sourceIPAddress": "198.51.100.6",
     "userIdentity": { "type": "IAMUser", "userName": "frank" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -200,7 +200,7 @@
     "awsRegion": "ap-southeast-1",
     "sourceIPAddress": "198.51.100.7",
     "userIdentity": { "type": "IAMUser", "userName": "grace" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -210,7 +210,7 @@
     "awsRegion": "eu-west-1",
     "sourceIPAddress": "198.51.100.8",
     "userIdentity": { "type": "IAMUser", "userName": "henry" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -220,7 +220,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.9",
     "userIdentity": { "type": "IAMUser", "userName": "ivy" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -230,7 +230,7 @@
     "awsRegion": "ap-northeast-1",
     "sourceIPAddress": "198.51.100.10",
     "userIdentity": { "type": "IAMUser", "userName": "jack" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "timestamp": "2026-04-10T12:00:01.000Z",
@@ -288,7 +288,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.11",
     "userIdentity": { "type": "IAMUser", "userName": "alice" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -298,7 +298,7 @@
     "awsRegion": "us-west-2",
     "sourceIPAddress": "198.51.100.12",
     "userIdentity": { "type": "IAMUser", "userName": "bob" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -308,7 +308,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.13",
     "userIdentity": { "type": "Root" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -318,7 +318,7 @@
     "awsRegion": "ap-southeast-1",
     "sourceIPAddress": "198.51.100.14",
     "userIdentity": { "type": "IAMUser", "userName": "carol" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -328,7 +328,7 @@
     "awsRegion": "ap-southeast-1",
     "sourceIPAddress": "198.51.100.15",
     "userIdentity": { "type": "IAMUser", "userName": "dave" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
 
   {
@@ -366,7 +366,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.16",
     "userIdentity": { "type": "IAMUser", "userName": "eve" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -376,7 +376,7 @@
     "awsRegion": "ap-northeast-1",
     "sourceIPAddress": "198.51.100.17",
     "userIdentity": { "type": "IAMUser", "userName": "frank" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "timestamp": "2026-04-10T12:40:01.000Z",
@@ -456,7 +456,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.18",
     "userIdentity": { "type": "IAMUser", "userName": "alice" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -466,7 +466,7 @@
     "awsRegion": "us-west-2",
     "sourceIPAddress": "198.51.100.19",
     "userIdentity": { "type": "IAMUser", "userName": "bob" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -476,7 +476,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.20",
     "userIdentity": { "type": "IAMUser", "userName": "carol" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -486,7 +486,7 @@
     "awsRegion": "ap-southeast-1",
     "sourceIPAddress": "198.51.100.21",
     "userIdentity": { "type": "IAMUser", "userName": "dave" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -496,7 +496,7 @@
     "awsRegion": "ap-southeast-1",
     "sourceIPAddress": "198.51.100.22",
     "userIdentity": { "type": "IAMUser", "userName": "eve" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
 
   {
@@ -577,7 +577,7 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.23",
     "userIdentity": { "type": "IAMUser", "userName": "frank" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -587,7 +587,7 @@
     "awsRegion": "ap-northeast-1",
     "sourceIPAddress": "198.51.100.24",
     "userIdentity": { "type": "IAMUser", "userName": "grace" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -597,7 +597,7 @@
     "awsRegion": "eu-west-1",
     "sourceIPAddress": "198.51.100.25",
     "userIdentity": { "type": "IAMUser", "userName": "henry" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   },
   {
     "eventVersion": "1.09",
@@ -617,6 +617,6 @@
     "awsRegion": "us-east-1",
     "sourceIPAddress": "198.51.100.27",
     "userIdentity": { "type": "IAMUser", "userName": "jack" },
-    "responseElements": { "status": "success" }
+    "responseElements": { "ConsoleLogin": "success" }
   }
 ]

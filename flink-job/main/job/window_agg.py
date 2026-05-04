@@ -6,7 +6,7 @@ and computes tumbling windows that count authentication events
 grouped by status_id (success/failure) per org_id.
 """
 
-from pyflink.datastream.window import TumblingProcessingTimeWindow
+from pyflink.datastream.window import TumblingProcessingTimeWindows
 from pyflink.datastream.functions import AggregateFunction, ProcessWindowFunction
 from pyflink.common.time import Time
 from datetime import datetime
@@ -96,7 +96,7 @@ def build_windowagg_pipeline(kafka_stream):
         .key_by(lambda e: e["metadata"]["org_id"])
 
         # Tumbling window based on processing time
-        .window(TumblingProcessingTimeWindow.of(Time.minutes(2)))
+        .window(TumblingProcessingTimeWindows.of(Time.minutes(2)))
 
         # NOTE: allowed_lateness + late data handling has no effect in processing-time windows
         .allowed_lateness(late_duration)
@@ -125,14 +125,15 @@ def create_flink_job(org_id: str):
         topic=source_topic,
         group_id="flink-aggregation-group"
     )
+    print(f"✅ Kafka source created for topic: {source_topic}")
     kafka_stream = env.add_source(kafka_source)
-
+    print("✅ Kafka source added to Flink environment")
     # Build aggregation pipeline
     windowagg_stream = build_windowagg_pipeline(kafka_stream)
-
+    print("✅ Window aggregation pipeline built")
     # Main sink: aggregated metrics
     windowagg_stream.add_sink(create_kafka_sink(sink_topic))
-
+    print(f"✅ Kafka sink created for topic: {sink_topic}")
     # Debug output (useful locally, remove in production)
     windowagg_stream.print()
 
@@ -144,14 +145,15 @@ def create_flink_job(org_id: str):
 
 
 def main():
+    org_id = "test_org"  # In production, this could be passed as an argument or env variable
     """Main entry point for the Flink job."""
     print("Starting OCSF Event Aggregation Flink Job...")
-    print("- Input Topic: logs.normalized.{org_id}")
-    print("- Output Topic: metrics.auth.{org_id}")
+    print(f"- Input Topic: logs.normalized.{org_id}")
+    print(f"- Output Topic: metrics.auth.{org_id}")
     print("- Window: 10-second tumbling (processing time)")
     print("- Aggregation: Count by status_id (success=1/failure=2)\n")
 
-    env = create_flink_job("123")
+    env = create_flink_job(org_id)
     env.execute("OCSF-Authentication-Event-Aggregation")
 
 
