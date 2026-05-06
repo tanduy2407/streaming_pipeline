@@ -10,6 +10,8 @@ from pyflink.common.time import Time
 from pyflink.common import WatermarkStrategy, Duration
 from pyflink.common.watermark_strategy import TimestampAssigner
 from datetime import datetime
+import json
+from pyflink.common.typeinfo import Types
 from flink_kafka_utils import create_env, create_kafka_source, create_kafka_sink, create_late_tag
 
 
@@ -53,9 +55,11 @@ class BruteForceAggregator(AggregateFunction):
 class BruteForceWindowFunction(ProcessWindowFunction):
     """Evaluates aggregated results and emits alert if threshold is exceeded."""
 
-    def process(self, key, context, aggregates, out):
+    def process(self, key, context, aggregates):
         # Since AggregateFunction outputs one result, extract it
-        result = list(aggregates)[0]
+        result = next(iter(aggregates), None)
+        if result is None:
+            return
 
         # Apply threshold filter (only alert on suspicious behavior)
         if result["failure_count"] < 10:
@@ -65,8 +69,8 @@ class BruteForceWindowFunction(ProcessWindowFunction):
         window_start = context.window().start
         window_end = context.window().end
 
-        # Build alert payload
-        alert = {
+        # Emit alert downstream (Kafka sink)
+        yield {
             "org_id": result["org_id"],
             "src_ip": result["src_ip"],
             "failure_count": result["failure_count"],
@@ -75,14 +79,10 @@ class BruteForceWindowFunction(ProcessWindowFunction):
             "alert_type": "BRUTE_FORCE"
         }
 
-        # Emit alert downstream (Kafka sink)
-        out.collect(alert)
-
 
 class EventTimeAssigner(TimestampAssigner):
     def extract_timestamp(self, event, record_timestamp):
-        data = json.loads(event)
-        return int(data["time"])
+        return int(event["time"])
 
 
 def assign_event_time(stream):
@@ -95,9 +95,9 @@ def assign_event_time(stream):
 
 # Side output tag for late events (arriving after allowed lateness)
 late_tag = create_late_tag()
-
+print(f"Late events will be sent to side output: {late_tag}")
 # Allow late events up to 30 seconds after window closes
-late_duration = Time.seconds(30)
+late_duration = 30000
 
 
 def build_bruteforce_pipeline(kafka_stream):
@@ -142,23 +142,42 @@ def create_flink_job(org_id: str):
         group_id="flink-aggregation-group"
     )
 
-    kafka_stream = env.add_source(kafka_source)
+    kafka_stream = env.from_source(
+        kafka_source,
+        WatermarkStrategy.no_watermarks(),
+        "kafka-source"
+    ).map(
+        lambda x: json.loads(x))
 
     # Assign event time and watermarks for proper windowing and late event handling
     kafka_stream = assign_event_time(kafka_stream)
 
     # Build detection pipeline
     bruteforce_stream = build_bruteforce_pipeline(kafka_stream)
+    late_stream = bruteforce_stream.get_side_output(late_tag)
+
+    bruteforce_stream = bruteforce_stream.map(
+        lambda x: json.dumps(x),
+        output_type=Types.STRING()
+    )
+    bruteforce_stream = bruteforce_stream.filter(lambda x: x is not None)
 
     # Main output: detected brute force alerts
-    bruteforce_stream.add_sink(create_kafka_sink(sink_topic))
+    bruteforce_stream.sink_to(create_kafka_sink(sink_topic))
 
     # Debug / local visibility
     bruteforce_stream.print()
 
     # Handle late events separately (DLQ for reprocessing or audit)
-    late_stream = bruteforce_stream.get_side_output(late_tag)
-    late_stream.add_sink(create_kafka_sink(dlq_topic))
+    late_stream = (
+        late_stream
+        .filter(lambda x: isinstance(x, dict))   # ✅ critical
+        .map(
+            lambda x: json.dumps(x),
+            output_type=Types.STRING()
+        )
+    )
+    late_stream.sink_to(create_kafka_sink(dlq_topic))
 
     return env
 

@@ -9,8 +9,11 @@ grouped by status_id (success/failure) per org_id.
 from pyflink.datastream.window import TumblingProcessingTimeWindows
 from pyflink.datastream.functions import AggregateFunction, ProcessWindowFunction
 from pyflink.common.time import Time
+from pyflink.common import WatermarkStrategy
 from datetime import datetime
 from typing import Dict, Any
+import json
+from pyflink.common.typeinfo import Types
 from flink_kafka_utils import create_env, create_kafka_source, create_kafka_sink, create_late_tag
 
 
@@ -64,9 +67,11 @@ class WindowResultFunction(ProcessWindowFunction):
     Enriches aggregation result with window metadata (start/end timestamps).
     """
 
-    def process(self, key, context, aggregates, out):
+    def process(self, key, context, aggregates):
         # AggregateFunction emits a single result per window
-        result = list(aggregates)[0]
+        result = next(iter(aggregates), None)
+        if result is None:
+            return
 
         # Extract window boundaries (processing time)
         window_start = context.window().start
@@ -78,7 +83,7 @@ class WindowResultFunction(ProcessWindowFunction):
         result["window_end"] = datetime.fromtimestamp(
             window_end / 1000).isoformat()
 
-        out.collect(result)
+        yield result
 
 
 # Side output tag for late events
@@ -126,20 +131,46 @@ def create_flink_job(org_id: str):
         group_id="flink-aggregation-group"
     )
     print(f"✅ Kafka source created for topic: {source_topic}")
-    kafka_stream = env.add_source(kafka_source)
+    kafka_stream = env.from_source(
+        kafka_source,
+        WatermarkStrategy.no_watermarks(),
+        "kafka-source"
+    ).map(
+        lambda x: json.loads(x)
+    )
     print("✅ Kafka source added to Flink environment")
+
     # Build aggregation pipeline
     windowagg_stream = build_windowagg_pipeline(kafka_stream)
+    late_stream = windowagg_stream.get_side_output(late_tag)
+
     print("✅ Window aggregation pipeline built")
+
+    windowagg_stream = windowagg_stream.map(
+        lambda x: json.dumps(x),
+        output_type=Types.STRING()
+    )
+    windowagg_stream = windowagg_stream.filter(lambda x: x is not None)
+    print("✅ Window aggregation results mapped to JSON strings")
+
     # Main sink: aggregated metrics
-    windowagg_stream.add_sink(create_kafka_sink(sink_topic))
+    windowagg_stream.sink_to(create_kafka_sink(sink_topic))
     print(f"✅ Kafka sink created for topic: {sink_topic}")
+
     # Debug output (useful locally, remove in production)
     windowagg_stream.print()
 
     # Side output: late events (will be empty with processing-time windows)
     late_stream = windowagg_stream.get_side_output(late_tag)
-    late_stream.add_sink(create_kafka_sink(dlq_topic))
+    late_stream = (
+        late_stream
+        .filter(lambda x: isinstance(x, dict))   # ✅ critical
+        .map(
+            lambda x: json.dumps(x),
+            output_type=Types.STRING()
+        )
+    )
+    late_stream.sink_to(create_kafka_sink(dlq_topic))
 
     return env
 
