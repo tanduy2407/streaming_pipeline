@@ -143,32 +143,29 @@ def create_flink_job(org_id: str):
     # Build aggregation pipeline
     windowagg_stream = build_windowagg_pipeline(kafka_stream)
     late_stream = windowagg_stream.get_side_output(late_tag)
+    main_stream = windowagg_stream
 
     print("✅ Window aggregation pipeline built")
 
-    windowagg_stream = windowagg_stream.map(
-        lambda x: json.dumps(x),
-        output_type=Types.STRING()
+    main_stream = (
+        main_stream
+        .filter(lambda x: isinstance(x, dict))
+        .map(lambda x: json.dumps(x), output_type=Types.STRING())
     )
-    windowagg_stream = windowagg_stream.filter(lambda x: x is not None)
     print("✅ Window aggregation results mapped to JSON strings")
 
     # Main sink: aggregated metrics
-    windowagg_stream.sink_to(create_kafka_sink(sink_topic))
+    main_stream.sink_to(create_kafka_sink(sink_topic))
     print(f"✅ Kafka sink created for topic: {sink_topic}")
 
     # Debug output (useful locally, remove in production)
-    windowagg_stream.print()
+    main_stream.print()
 
     # Side output: late events (will be empty with processing-time windows)
-    late_stream = windowagg_stream.get_side_output(late_tag)
     late_stream = (
         late_stream
-        .filter(lambda x: isinstance(x, dict))   # ✅ critical
-        .map(
-            lambda x: json.dumps(x),
-            output_type=Types.STRING()
-        )
+        .filter(lambda x: isinstance(x, dict))
+        .map(lambda x: json.dumps(x), output_type=Types.STRING())
     )
     late_stream.sink_to(create_kafka_sink(dlq_topic))
 

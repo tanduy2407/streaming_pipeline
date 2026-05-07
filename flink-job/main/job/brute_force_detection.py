@@ -156,14 +156,15 @@ def create_flink_job(org_id: str):
     bruteforce_stream = build_bruteforce_pipeline(kafka_stream)
     late_stream = bruteforce_stream.get_side_output(late_tag)
 
-    bruteforce_stream = bruteforce_stream.map(
-        lambda x: json.dumps(x),
-        output_type=Types.STRING()
-    )
-    bruteforce_stream = bruteforce_stream.filter(lambda x: x is not None)
+    main_stream = bruteforce_stream
 
+    main_stream = (
+        main_stream
+        .filter(lambda x: isinstance(x, dict))
+        .map(lambda x: json.dumps(x), output_type=Types.STRING())
+    )
     # Main output: detected brute force alerts
-    bruteforce_stream.sink_to(create_kafka_sink(sink_topic))
+    main_stream.sink_to(create_kafka_sink(sink_topic))
 
     # Debug / local visibility
     bruteforce_stream.print()
@@ -171,14 +172,11 @@ def create_flink_job(org_id: str):
     # Handle late events separately (DLQ for reprocessing or audit)
     late_stream = (
         late_stream
-        .filter(lambda x: isinstance(x, dict))   # ✅ critical
-        .map(
-            lambda x: json.dumps(x),
-            output_type=Types.STRING()
-        )
+        .filter(lambda x: isinstance(x, dict))
+        .map(lambda x: json.dumps(x), output_type=Types.STRING())
     )
-    late_stream.sink_to(create_kafka_sink(dlq_topic))
 
+    late_stream.sink_to(create_kafka_sink(dlq_topic))
     return env
 
 

@@ -14,7 +14,7 @@ echo "Flink is ready. Submitting jobs..."
 
 # Run both jobs in parallel
 flink run -py /opt/flink/app/brute_force_detection.py &
-# flink run -py /opt/flink/app/window_agg.py &
+flink run -py /opt/flink/app/window_agg.py &
 
 # Wait for both jobs (keeps container alive)
 wait
