@@ -206,7 +206,7 @@ def stream_pipeline(org_id: str):
     producer = None
     dlq_producer = None
     try:
-        consumer = KafkaConsumerStream(org_id)
+        consumer = KafkaConsumerStream(org_id, f"logs.raw.{org_id}")
         producer = KafkaProducerStream(org_id)
         dlq_producer = KafkaDLQProducer(org_id)
         logger.info(f"Connected to topic: logs.raw.{org_id}")

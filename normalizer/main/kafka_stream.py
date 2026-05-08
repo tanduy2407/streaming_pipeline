@@ -4,10 +4,10 @@ import json
 
 
 class KafkaConsumerStream:
-    def __init__(self, org_id: str):
+    def __init__(self, org_id: str, topic: str):
         """Initialize Kafka consumer for consuming raw logs."""
         self.org_id = org_id
-        self.topic = f"logs.raw.{org_id}"
+        self.topic = topic
         while True:
             try:
                 self.consumer = KafkaConsumer(
