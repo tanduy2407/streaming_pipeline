@@ -1,13 +1,15 @@
 import time
 from kafka import KafkaConsumer, KafkaProducer
+from kafka.errors import KafkaError
 import json
 
 
 class KafkaConsumerStream:
-    def __init__(self, org_id: str, topic: str):
+    def __init__(self, org_id: str, topic: str, group_id: str):
         """Initialize Kafka consumer for consuming raw logs."""
         self.org_id = org_id
         self.topic = topic
+        self.group_id = group_id
         while True:
             try:
                 self.consumer = KafkaConsumer(
@@ -16,11 +18,11 @@ class KafkaConsumerStream:
                     value_deserializer=lambda m: json.loads(m.decode("utf-8")),
                     auto_offset_reset="earliest",
                     enable_auto_commit=True,
-                    group_id="normalizer-group"
+                    group_id=self.group_id
                 )
                 print(f"✅ Connected to Kafka topic: {self.topic}")
                 break
-            except Exception as e:
+            except KafkaError as e:
                 print(f"Error connecting to Kafka: {e}")
                 time.sleep(5)  # Retry after delay
 
@@ -46,7 +48,7 @@ class KafkaProducerStream:
                 )
                 print(f"✅ Connected to Kafka for producing to topic: logs.normalized.{self.org_id}")
                 break
-            except Exception as e:
+            except KafkaError as e:
                 print(f"Error connecting to Kafka: {e}")
                 time.sleep(5)  # Retry after delay
 
